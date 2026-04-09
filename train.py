@@ -36,7 +36,8 @@ def build_loggers(cfg, config_path: str):
         os.path.basename(config_path))[0]
 
     wandb_project = lc.get('wandb_project', 'pilot-action-recognition')
-    loggers.append(WandbLogger(project=wandb_project, name=run_name))
+    wandb_mode = lc.get('wandb_mode', 'online')
+    loggers.append(WandbLogger(project=wandb_project, name=run_name, mode=wandb_mode))
     loggers.append(TensorBoardLogger(save_dir='logs/tb', name=run_name))
     return loggers
 
@@ -54,7 +55,7 @@ def main():
         monitor='val/acc1',
         mode='max',
         save_top_k=cfg.logging.get('save_top_k', 3),
-        filename='epoch{epoch:03d}-acc{val_acc1:.4f}',
+        filename='epoch{epoch:03d}-acc1={val/acc1:.4f}',
         save_last=True,
     )
     lr_monitor = LearningRateMonitor(logging_interval='epoch')
@@ -71,7 +72,7 @@ def main():
         callbacks=[checkpoint_cb, lr_monitor],
         logger=loggers if loggers else True,
         log_every_n_steps=cfg.logging.get('log_every_n_steps', 50),
-        precision='16-mixed',
+        precision='bf16-mixed',
         gradient_clip_val=None,  # Handled in on_before_optimizer_step
         devices=devices,
         strategy=strategy,
