@@ -1,0 +1,5 @@
+_base_: base.yaml
+model:
+  enable_stta: false
+logging:
+  wandb_name: slowfast_baseline

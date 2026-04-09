@@ -1,0 +1,36 @@
+[project]
+name = "pilot-action-recognition"
+version = "0.1.0"
+requires-python = ">=3.11,<3.13"
+
+dependencies = [
+    "torch==2.7.1",
+    "torchvision==0.22.1",
+    "pytorch-lightning>=2.0.0",
+    "wandb",
+    "tensorboard",
+    "pyyaml",
+    "pandas",
+    "pillow",
+    "einops",
+    "rich",
+]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning:torchmetrics",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest",
+    "pytest-cov",
+]
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu118"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch"}

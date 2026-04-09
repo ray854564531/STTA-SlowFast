@@ -1,0 +1,7 @@
+_base_: base.yaml
+model:
+  enable_tcw: true
+  enable_tch: false
+  enable_thw: true
+logging:
+  wandb_name: ablation_tcw_thw

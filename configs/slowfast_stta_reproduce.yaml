@@ -1,0 +1,12 @@
+_base_: base.yaml
+
+data:
+  batch_size: 8
+  num_workers: 2
+
+trainer:
+  devices: 2
+  strategy: ddp
+
+logging:
+  wandb_name: slowfast_stta_reproduce

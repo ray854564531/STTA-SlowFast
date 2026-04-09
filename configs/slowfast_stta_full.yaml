@@ -1,0 +1,3 @@
+_base_: base.yaml
+logging:
+  wandb_name: slowfast_stta_full

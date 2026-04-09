@@ -1,0 +1,16 @@
+# cache
+__pycache__
+.pytest_cache
+
+# Agent
+.claude
+
+# venv
+.venv
+
+# my train
+wandb
+logs
+
+# works
+work_dirs
