@@ -46,7 +46,7 @@ model = dict(
                 1,
             ),
             stta_kernel_size=7,
-            stta_stages=[
+            fast_stta_stages=[
                 True,
                 True,
                 True,

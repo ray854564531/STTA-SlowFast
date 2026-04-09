@@ -30,6 +30,7 @@ class KeyframeClipDataset(Dataset):
         self.transform = transform
         self.filename_tmpl = filename_tmpl
         self.samples = self._load_annotations(ann_file)
+        self._total_frames_cache = self._build_frame_count_cache()
 
     def _load_annotations(self, ann_file):
         df = pd.read_csv(ann_file)
@@ -42,10 +43,18 @@ class KeyframeClipDataset(Dataset):
             })
         return samples
 
+    def _build_frame_count_cache(self):
+        cache = {}
+        for s in self.samples:
+            vid = s['video_id']
+            if vid not in cache:
+                frame_dir = os.path.join(self.data_root, vid)
+                cache[vid] = len([f for f in os.listdir(frame_dir)
+                                   if f.endswith('.jpg') or f.endswith('.png')])
+        return cache
+
     def _get_total_frames(self, video_id):
-        frame_dir = os.path.join(self.data_root, video_id)
-        return len([f for f in os.listdir(frame_dir)
-                    if f.endswith('.jpg') or f.endswith('.png')])
+        return self._total_frames_cache[video_id]
 
     def _sample_frame_indices(self, keyframe_id, total_frames):
         center = keyframe_id

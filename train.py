@@ -8,9 +8,10 @@ import os
 import sys
 
 import torch
+import yaml
 import pytorch_lightning as pl
 
-torch.set_float32_matmul_precision('medium')
+torch.set_float32_matmul_precision('highest')
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger
 
@@ -32,13 +33,14 @@ def build_loggers(cfg, config_path: str):
     if lc is None:
         return loggers
 
-    run_name = lc.get('wandb_name', None) or os.path.splitext(
-        os.path.basename(config_path))[0]
+    config_name = os.path.splitext(os.path.basename(config_path))[0]
+    wandb_run_name = lc.get('wandb_name', None) or config_name
 
     wandb_project = lc.get('wandb_project', 'pilot-action-recognition')
     wandb_mode = lc.get('wandb_mode', 'online')
-    loggers.append(WandbLogger(project=wandb_project, name=run_name, mode=wandb_mode))
-    loggers.append(TensorBoardLogger(save_dir='logs/tb', name=run_name))
+    if wandb_mode != 'disabled':
+        loggers.append(WandbLogger(project=wandb_project, name=wandb_run_name, mode=wandb_mode))
+    loggers.append(TensorBoardLogger(save_dir='logs/tb', name=config_name))
     return loggers
 
 
@@ -50,12 +52,18 @@ def main():
     module = SlowFastSTTALightningModule(cfg)
     datamodule = PilotDataModule(cfg)
 
+    ckpt_dir = f'work_dirs/{os.path.splitext(os.path.basename(args.config))[0]}'
+    os.makedirs(ckpt_dir, exist_ok=True)
+    with open(os.path.join(ckpt_dir, 'config.yaml'), 'w') as f:
+        yaml.dump(cfg.to_dict(), f, default_flow_style=False, allow_unicode=True)
+
     checkpoint_cb = ModelCheckpoint(
-        dirpath=f'work_dirs/{os.path.splitext(os.path.basename(args.config))[0]}',
+        dirpath=ckpt_dir,
         monitor='val/acc1',
         mode='max',
         save_top_k=cfg.logging.get('save_top_k', 3),
-        filename='epoch{epoch:03d}-acc1={val/acc1:.4f}',
+        filename='epoch={epoch:03d}-val_acc1={val/acc1:.4f}',
+        auto_insert_metric_name=False,
         save_last=True,
     )
     lr_monitor = LearningRateMonitor(logging_interval='epoch')
@@ -72,7 +80,7 @@ def main():
         callbacks=[checkpoint_cb, lr_monitor],
         logger=loggers if loggers else True,
         log_every_n_steps=cfg.logging.get('log_every_n_steps', 50),
-        precision='bf16-mixed',
+        precision='32',
         gradient_clip_val=None,  # Handled in on_before_optimizer_step
         devices=devices,
         strategy=strategy,

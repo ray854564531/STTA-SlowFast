@@ -1,6 +1,6 @@
 _base_: base.yaml
 model:
-  enable_tcw: true
+  fast_stta_stages: [true, true, true, true]
   enable_tch: false
   enable_thw: false
 logging:

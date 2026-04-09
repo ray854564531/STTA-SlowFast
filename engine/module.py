@@ -22,6 +22,7 @@ class SlowFastSTTALightningModule(pl.LightningModule):
 
     def __init__(self, cfg: Config) -> None:
         super().__init__()
+        self.save_hyperparameters(cfg.to_dict())
         self.cfg = cfg
         mc = cfg.model
         tc = cfg.train
@@ -52,7 +53,8 @@ class SlowFastSTTALightningModule(pl.LightningModule):
                 spatial_strides=(1, 2, 2, 1),
             ),
             stta_kernel_size=mc.kernel_size,
-            stta_stages=mc.stta_stages,
+            fast_stta_stages=mc.fast_stta_stages,
+            slow_stta_stages=mc.get('slow_stta_stages', [False, False, False, False]),
             enable_stta=mc.get('enable_stta', True),
             stta_enable_tcw=mc.get('enable_tcw', True),
             stta_enable_tch=mc.get('enable_tch', True),
@@ -110,10 +112,12 @@ class SlowFastSTTALightningModule(pl.LightningModule):
         total_epochs = self._max_epochs
 
         def lr_lambda(epoch: int) -> float:
+            # Cosine runs from epoch 0 with T_max=160, matching mmaction2 config
+            cosine = 0.5 * (1.0 + math.cos(math.pi * epoch / 160))
             if epoch < warmup_epochs:
-                return start_factor + (1.0 - start_factor) * epoch / max(warmup_epochs, 1)
-            t = (epoch - warmup_epochs) / max(total_epochs - warmup_epochs, 1)
-            return 0.5 * (1.0 + math.cos(math.pi * t))
+                linear = start_factor + (1.0 - start_factor) * epoch / max(warmup_epochs, 1)
+                return linear * cosine
+            return cosine
 
         scheduler = LambdaLR(optimizer, lr_lambda=lr_lambda)
         return {

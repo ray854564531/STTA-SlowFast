@@ -2,11 +2,14 @@ _base_: base.yaml
 
 data:
   batch_size: 8
-  num_workers: 2
+  num_workers: 8
+
+model:
+  fast_stta_stages: [true, true, true, true]
 
 trainer:
   devices: 2
   strategy: ddp
 
 logging:
-  wandb_name: disabled
+  wandb_mode: disabled

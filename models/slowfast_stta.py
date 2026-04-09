@@ -1,7 +1,7 @@
 """SlowFast + STTripletAttention. Ported from mmaction2, mm-free.
 
-STTA is applied to fast pathway AFTER each ResNet stage,
-BEFORE the lateral connection feeds enhanced features into slow pathway.
+STTA can be applied to fast and/or slow pathway AFTER each ResNet stage,
+BEFORE the lateral connection feeds features between pathways.
 """
 from typing import Dict, List, Optional, Tuple
 
@@ -45,20 +45,21 @@ class ResNet3dPathwayWithSTTA(ResNet3dPathway):
 
 
 class SlowFastWithSTTA(nn.Module):
-    """SlowFast backbone with stage-wise STTripletAttention in fast pathway.
+    """SlowFast backbone with stage-wise STTripletAttention.
 
-    STTA is applied to fast pathway after each stage, BEFORE lateral
-    connections transfer features to slow pathway.
+    STTA can be applied to fast and/or slow pathway after each stage,
+    BEFORE lateral connections transfer features between pathways.
 
     Args:
         resample_rate: Temporal downsampling for slow (tau). Default 4.
         speed_ratio: Fast/slow temporal ratio (alpha). Default 4.
         channel_ratio: Slow/fast channel ratio (beta). Default 8.
-        slow_pathway: kwargs for slow ResNet3dPathway (lateral=True).
+        slow_pathway: kwargs for slow ResNet3dPathwayWithSTTA (lateral=True).
         fast_pathway: kwargs for fast ResNet3dPathwayWithSTTA (lateral=False).
         enable_stta: Master switch for STTA. False = baseline (no STTA).
         stta_kernel_size: 3D conv kernel for STTA. Default 7.
-        stta_stages: Which stages get STTA. Default all 4.
+        fast_stta_stages: Which fast pathway stages get STTA. Default all 4.
+        slow_stta_stages: Which slow pathway stages get STTA. Default none.
         stta_enable_tcw: Enable T-C-W branch. Default True.
         stta_enable_tch: Enable T-C-H branch. Default True.
         stta_enable_thw: Enable T-H-W branch. Default True.
@@ -73,7 +74,8 @@ class SlowFastWithSTTA(nn.Module):
         fast_pathway: Optional[Dict] = None,
         enable_stta: bool = True,
         stta_kernel_size: int = 7,
-        stta_stages: List[bool] = (True, True, True, True),
+        fast_stta_stages: List[bool] = (True, True, True, True),
+        slow_stta_stages: List[bool] = (False, False, False, False),
         stta_enable_tcw: bool = True,
         stta_enable_tch: bool = True,
         stta_enable_thw: bool = True,
@@ -90,11 +92,19 @@ class SlowFastWithSTTA(nn.Module):
             slow_cfg.setdefault('speed_ratio', speed_ratio)
             slow_cfg.setdefault('channel_ratio', channel_ratio)
 
-        self.slow_path = ResNet3dPathway(**slow_cfg)
+        self.slow_path = ResNet3dPathwayWithSTTA(
+            enable_stta=enable_stta,
+            stta_kernel_size=stta_kernel_size,
+            stta_stages=slow_stta_stages,
+            stta_enable_tcw=stta_enable_tcw,
+            stta_enable_tch=stta_enable_tch,
+            stta_enable_thw=stta_enable_thw,
+            **slow_cfg,
+        )
         self.fast_path = ResNet3dPathwayWithSTTA(
             enable_stta=enable_stta,
             stta_kernel_size=stta_kernel_size,
-            stta_stages=stta_stages,
+            stta_stages=fast_stta_stages,
             stta_enable_tcw=stta_enable_tcw,
             stta_enable_tch=stta_enable_tch,
             stta_enable_thw=stta_enable_thw,
@@ -123,18 +133,24 @@ class SlowFastWithSTTA(nn.Module):
             x_slow = torch.cat(
                 [x_slow, self.slow_path.conv1_lateral(x_fast)], dim=1)
 
-        # Stage-by-stage: fast stage → STTA → lateral → slow
+        # Stage-by-stage: slow stage → slow STTA → fast stage → fast STTA → lateral
         for i, layer_name in enumerate(self.slow_path.res_layers):
             x_slow = getattr(self.slow_path, layer_name)(x_slow)
             x_fast = getattr(self.fast_path, layer_name)(x_fast)
 
-            # Apply STTA to fast pathway (BEFORE lateral)
             stta_name = f'layer{i+1}_stta'
+
+            # Apply STTA to slow pathway (BEFORE lateral)
+            if (hasattr(self.slow_path, 'stta_modules') and
+                    stta_name in self.slow_path.stta_modules):
+                x_slow = self.slow_path.stta_modules[stta_name](x_slow)
+
+            # Apply STTA to fast pathway (BEFORE lateral)
             if (hasattr(self.fast_path, 'stta_modules') and
                     stta_name in self.fast_path.stta_modules):
                 x_fast = self.fast_path.stta_modules[stta_name](x_fast)
 
-            # Lateral: STTA-enhanced fast → slow (not after last stage)
+            # Lateral: fast → slow (not after last stage)
             if (i < len(self.slow_path.res_layers) - 1
                     and self.slow_path.lateral
                     and i < len(self.slow_path.lateral_connections)):

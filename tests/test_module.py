@@ -18,7 +18,7 @@ def _make_cfg(enable_tcw=True, enable_tch=True, enable_thw=True):
             'channel_ratio': 8,
             'kernel_size': 7,
             'dropout': 0.5,
-            'stta_stages': [True, True, True, True],
+            'fast_stta_stages': [True, True, True, True],
             'enable_tcw': enable_tcw,
             'enable_tch': enable_tch,
             'enable_thw': enable_thw,
@@ -85,7 +85,7 @@ def test_end_to_end_with_real_data(tmp_path):
         'model': {
             'resample_rate': 4, 'speed_ratio': 4, 'channel_ratio': 8,
             'kernel_size': 7, 'dropout': 0.5,
-            'stta_stages': [True, True, True, True],
+            'fast_stta_stages': [True, True, True, True],
             'enable_tcw': True, 'enable_tch': True, 'enable_thw': True,
         },
         'data': {

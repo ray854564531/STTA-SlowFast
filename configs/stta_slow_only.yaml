@@ -1,6 +1,5 @@
 _base_: base.yaml
 model:
-  fast_stta_stages: [true, true, true, true]
   slow_stta_stages: [true, true, true, true]
 logging:
-  wandb_name: slowfast_stta_full
+  wandb_name: stta_slow_only

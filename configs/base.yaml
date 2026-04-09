@@ -15,7 +15,8 @@ model:
   channel_ratio: 8
   kernel_size: 7
   dropout: 0.5
-  stta_stages: [true, true, true, true]
+  fast_stta_stages: [false, false, false, false]
+  slow_stta_stages: [false, false, false, false]
   enable_tcw: true
   enable_tch: true
   enable_thw: true

@@ -83,7 +83,7 @@ def _make_slowfast_stta(enable_tcw=True, enable_tch=True, enable_thw=True, enabl
             spatial_strides=(1, 2, 2, 1),
         ),
         stta_kernel_size=7,
-        stta_stages=[True, True, True, True],
+        fast_stta_stages=[True, True, True, True],
         enable_stta=enable_stta,
         stta_enable_tcw=enable_tcw,
         stta_enable_tch=enable_tch,
