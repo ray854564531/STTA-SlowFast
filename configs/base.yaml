@@ -33,6 +33,7 @@ train:
 logging:
   wandb_project: pilot-action-recognition
   wandb_name: null
-  log_every_n_steps: 50
+  wandb_mode: online  # online | offline | disabled
+  log_every_n_steps: 4
   save_top_k: 3
   val_check_interval: 2

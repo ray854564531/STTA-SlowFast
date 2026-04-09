@@ -21,8 +21,8 @@ filterwarnings = [
     "ignore::DeprecationWarning:torchmetrics",
 ]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest",
     "pytest-cov",
 ]

@@ -2,16 +2,7 @@
 import torch
 import pytorch_lightning as pl
 
-def _pin_memory_available() -> bool:
-    if not torch.cuda.is_available():
-        return False
-    try:
-        torch.zeros(1).cuda()
-        return True
-    except RuntimeError:
-        return False
-
-_PIN_MEMORY = _pin_memory_available()
+_PIN_MEMORY = False
 from torch.utils.data import DataLoader
 from .dataset import KeyframeClipDataset
 from .transforms import build_train_transforms, build_val_transforms

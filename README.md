@@ -21,7 +21,8 @@ pilot_project/
 ├── train.py                  # 训练入口
 ├── configs/
 │   ├── base.yaml             # 公共超参数
-│   ├── slowfast_stta_full.yaml   # 主实验（全部 STTA）
+│   ├── slowfast_stta_reproduce.yaml  # 复现 94.84%（2 GPU × bs8）
+│   ├── slowfast_stta_full.yaml   # 主实验（全部 STTA，单 GPU）
 │   ├── slowfast_baseline.yaml    # 无注意力基线
 │   ├── ablation_tcw_only.yaml    # 消融：仅 T-C-W
 │   ├── ablation_tch_only.yaml    # 消融：仅 T-C-H
@@ -88,7 +89,10 @@ video_id,keyframe_id,action_id
 ```bash
 cd pilot_project
 
-# 主实验（SlowFast + 全 STTA）
+# 复现 94.84%（2 GPU DDP，等效 batch=16）
+uv run train.py --config configs/slowfast_stta_reproduce.yaml
+
+# 主实验（SlowFast + 全 STTA，单 GPU）
 uv run train.py --config configs/slowfast_stta_full.yaml
 
 # 无注意力基线
@@ -99,10 +103,27 @@ uv run train.py --config configs/ablation_tcw_only.yaml
 uv run train.py --config configs/ablation_tch_thw.yaml
 ```
 
-首次运行会提示 `wandb login`，如需跳过：
+多 GPU 训练通过 YAML 中的 `trainer.devices` 和 `trainer.strategy` 字段控制，无需修改代码：
+
+```yaml
+trainer:
+  devices: 2       # GPU 数量
+  strategy: ddp    # 分布式策略
+```
+
+**wandb 日志模式**通过 YAML 的 `logging.wandb_mode` 字段控制：
+
+```yaml
+logging:
+  wandb_mode: online    # 默认，联网上传
+  # wandb_mode: offline # 本地保存，之后可用 wandb sync 手动上传
+  # wandb_mode: disabled # 完全禁用 wandb，仅保留 TensorBoard
+```
+
+也可通过环境变量临时覆盖：
 
 ```bash
-WANDB_MODE=disabled uv run train.py --config configs/slowfast_stta_full.yaml
+WANDB_MODE=offline uv run train.py --config configs/slowfast_stta_full.yaml
 ```
 
 ## 关键超参数（base.yaml）
@@ -110,7 +131,7 @@ WANDB_MODE=disabled uv run train.py --config configs/slowfast_stta_full.yaml
 | 参数 | 值 |
 |------|----|
 | clip_len | 32 |
-| batch_size | 8 |
+| batch_size | 4（单 GPU）/ 8 per GPU（多 GPU 复现） |
 | optimizer | SGD |
 | lr | 0.1 |
 | momentum | 0.9 |

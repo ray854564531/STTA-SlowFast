@@ -9,4 +9,4 @@ trainer:
   strategy: ddp
 
 logging:
-  wandb_name: slowfast_stta_reproduce
+  wandb_name: disabled

@@ -81,9 +81,9 @@ class SlowFastSTTALightningModule(pl.LightningModule):
         acc1 = top_k_accuracy(logits, y, k=1)
         acc5 = top_k_accuracy(logits, y, k=min(5, logits.size(1)))
         if self._trainer is not None:
-            self.log('train/loss', loss, on_step=True, on_epoch=True, prog_bar=True)
-            self.log('train/acc1', acc1, on_step=False, on_epoch=True)
-            self.log('train/acc5', acc5, on_step=False, on_epoch=True)
+            self.log('train/loss', loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('train/acc1', acc1, on_step=False, on_epoch=True, sync_dist=True)
+            self.log('train/acc5', acc5, on_step=False, on_epoch=True, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx: int) -> None:
