@@ -70,3 +70,68 @@ def test_validation_step_runs():
     x = torch.randn(2, 3, 8, 224, 224)
     y = torch.tensor([0, 3])
     module.validation_step((x, y), batch_idx=0)  # must not raise
+
+
+def test_c3d_module_forward():
+    """C3D: input (B, C, 16, 112, 112), output (B, 8)."""
+    cfg = Config({
+        'model': {'type': 'c3d', 'pretrained': False, 'feat_dim': 4096},
+        'data': {'num_classes': 8, 'clip_len': 16},
+        'train': {
+            'lr': 0.01, 'momentum': 0.9, 'weight_decay': 5e-4,
+            'grad_clip': 40, 'max_epochs': 50,
+            'warmup_epochs': 5, 'warmup_start_factor': 0.1,
+        },
+        'logging': {},
+    })
+    module = BaselineLightningModule(cfg)
+    module.eval()
+    x = torch.zeros(1, 3, 16, 112, 112)
+    with torch.no_grad():
+        out = module(x)
+    assert out.shape == (1, 8)
+
+
+def test_i3d_module_forward():
+    """I3D: input (B, C, 32, 224, 224), output (B, 8)."""
+    cfg = Config({
+        'model': {'type': 'i3d', 'pretrained': False, 'feat_dim': 2048},
+        'data': {'num_classes': 8, 'clip_len': 32},
+        'train': {
+            'lr': 0.01, 'momentum': 0.9, 'weight_decay': 5e-4,
+            'grad_clip': 40, 'max_epochs': 50,
+            'warmup_epochs': 5, 'warmup_start_factor': 0.1,
+        },
+        'logging': {},
+    })
+    module = BaselineLightningModule(cfg)
+    module.eval()
+    x = torch.zeros(1, 3, 32, 224, 224)
+    with torch.no_grad():
+        out = module(x)
+    assert out.shape == (1, 8)
+
+
+def test_r2plus1d_module_forward():
+    """R(2+1)D: input (B, C, 16, 224, 224), output (B, 8).
+
+    The pytorchvideo r2plus1d_r50 head uses AvgPool3d(kernel=(4,7,7));
+    224×224 spatial input is required so the spatial dims are ≥7 after
+    the backbone's stride-32 downsampling.
+    """
+    cfg = Config({
+        'model': {'type': 'r2plus1d', 'pretrained': False, 'feat_dim': 512},
+        'data': {'num_classes': 8, 'clip_len': 16},
+        'train': {
+            'lr': 0.01, 'momentum': 0.9, 'weight_decay': 5e-4,
+            'grad_clip': 40, 'max_epochs': 50,
+            'warmup_epochs': 5, 'warmup_start_factor': 0.1,
+        },
+        'logging': {},
+    })
+    module = BaselineLightningModule(cfg)
+    module.eval()
+    x = torch.zeros(1, 3, 16, 224, 224)
+    with torch.no_grad():
+        out = module(x)
+    assert out.shape == (1, 8)

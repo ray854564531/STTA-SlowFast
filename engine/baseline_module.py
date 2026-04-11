@@ -55,52 +55,64 @@ def model_factory(model_type: str, cfg: Config) -> nn.Module:
                      f"Choose from: tsn, tsm, c3d, i3d, r2plus1d")
 
 
-def _build_c3d(num_classes: int, pretrained: bool) -> nn.Module:
-    """C3D with Sports-1M pretrained weights.
+class _C3D(nn.Module):
+    """VGG-style C3D network (input: B x 3 x 16 x 112 x 112).
 
-    Architecture: pytorchvideo create_c3d (VGG-style 5 conv blocks + FC head).
-    Builds with 487 Sports-1M classes, loads weights, then replaces head.
+    Architecture follows the original Tran et al. 2015 paper:
+    5 conv blocks with max-pool, then two FC layers before the classifier.
+    Supports pretrained=False (random init) only; pretrained loading is
+    left as a future extension since pytorchvideo ≤ 0.1.5 ships no C3D.
     """
-    from pytorchvideo.models.c3d import create_c3d
-    model = create_c3d(model_num_class=487)
+
+    def __init__(self, num_classes: int) -> None:
+        super().__init__()
+        self.features = nn.Sequential(
+            # block 1
+            nn.Conv3d(3, 64, kernel_size=3, padding=1), nn.ReLU(inplace=True),
+            nn.MaxPool3d(kernel_size=(1, 2, 2), stride=(1, 2, 2)),
+            # block 2
+            nn.Conv3d(64, 128, kernel_size=3, padding=1), nn.ReLU(inplace=True),
+            nn.MaxPool3d(kernel_size=2, stride=2),
+            # block 3
+            nn.Conv3d(128, 256, kernel_size=3, padding=1), nn.ReLU(inplace=True),
+            nn.Conv3d(256, 256, kernel_size=3, padding=1), nn.ReLU(inplace=True),
+            nn.MaxPool3d(kernel_size=2, stride=2),
+            # block 4
+            nn.Conv3d(256, 512, kernel_size=3, padding=1), nn.ReLU(inplace=True),
+            nn.Conv3d(512, 512, kernel_size=3, padding=1), nn.ReLU(inplace=True),
+            nn.MaxPool3d(kernel_size=2, stride=2),
+            # block 5
+            nn.Conv3d(512, 512, kernel_size=3, padding=1), nn.ReLU(inplace=True),
+            nn.Conv3d(512, 512, kernel_size=3, padding=1), nn.ReLU(inplace=True),
+            nn.MaxPool3d(kernel_size=2, stride=2),
+        )
+        # After pooling: T=16→16→8→4→2→1, H/W=112→56→28→14→7→3 (floor)
+        self.classifier = nn.Sequential(
+            nn.AdaptiveAvgPool3d(1),
+            nn.Flatten(),
+            nn.Linear(512, 4096), nn.ReLU(inplace=True), nn.Dropout(0.5),
+            nn.Linear(4096, 4096), nn.ReLU(inplace=True), nn.Dropout(0.5),
+            nn.Linear(4096, num_classes),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # (B,3,T,H,W)
+        x = self.features(x)
+        return self.classifier(x)
+
+
+def _build_c3d(num_classes: int, pretrained: bool) -> nn.Module:
+    """C3D (VGG-style, input 16×112×112).
+
+    pytorchvideo ≤ 0.1.5 does not ship a C3D module, so we use a built-in
+    implementation. pretrained=True would require an external checkpoint;
+    for CI (pretrained=False) the model is randomly initialised.
+    """
     if pretrained:
-        url = ('https://download.openmmlab.com/mmaction/recognition/c3d/'
-               'c3d_sports1m_pretrain_20201016-dcc47ddc.pth')
-        ckpt = torch.hub.load_state_dict_from_url(url, map_location='cpu')
-        state = ckpt.get('state_dict', ckpt)
-        state = _remap_c3d_keys(state)
-        missing, unexpected = model.load_state_dict(state, strict=False)
-        if missing:
-            print(f"[C3D] Missing keys ({len(missing)}): {missing[:5]} ...")
-    in_features = model.blocks[-1].proj.in_features
-    model.blocks[-1].proj = nn.Linear(in_features, num_classes)
-    return model
-
-
-def _remap_c3d_keys(state: dict) -> dict:
-    """Remap MMAction2 C3D key names to pytorchvideo C3D key names."""
-    mapping = {
-        'backbone.conv1a': 'blocks.0.conv',
-        'backbone.conv2a': 'blocks.1.conv',
-        'backbone.conv3a': 'blocks.2.conv',
-        'backbone.conv3b': 'blocks.2.conv',
-        'backbone.conv4a': 'blocks.3.conv',
-        'backbone.conv4b': 'blocks.3.conv',
-        'backbone.conv5a': 'blocks.4.conv',
-        'backbone.conv5b': 'blocks.4.conv',
-        'cls_head.fc1': 'blocks.5.fc1',
-        'cls_head.fc2': 'blocks.5.fc2',
-        'cls_head.fc_cls': 'blocks.5.proj',
-    }
-    new_state = {}
-    for k, v in state.items():
-        new_key = k
-        for old_prefix, new_prefix in mapping.items():
-            if k.startswith(old_prefix):
-                new_key = k.replace(old_prefix, new_prefix, 1)
-                break
-        new_state[new_key] = v
-    return new_state
+        raise NotImplementedError(
+            "C3D pretrained loading is not implemented in this codebase "
+            "(pytorchvideo ≤ 0.1.5 has no create_c3d). Pass pretrained=False."
+        )
+    return _C3D(num_classes=num_classes)
 
 
 def _build_i3d(num_classes: int, pretrained: bool) -> nn.Module:
