@@ -25,19 +25,33 @@ class KeyframeClipDataset(Dataset):
 
     def __init__(self, ann_file, data_root, clip_len=32, frame_interval=1,
                  jitter_range=0, sampling='uniform', segment_window=64,
-                 transform=None, filename_tmpl='img_{:05d}.jpg'):
+                 is_train=True, transform=None, filename_tmpl='img_{:05d}.jpg'):
         self.data_root = data_root
         self.clip_len = clip_len
         self.frame_interval = frame_interval
         self.jitter_range = jitter_range
         self.sampling = sampling
         self.segment_window = segment_window
+        self.is_train = is_train
         self.transform = transform
         self.filename_tmpl = filename_tmpl
         self.samples = self._load_annotations(ann_file)
         self._total_frames_cache = self._build_frame_count_cache()
-        # True during training (stochastic segment pick), False for val
-        self._is_train = True
+
+        # Validation: check sampling mode
+        if self.sampling not in ('uniform', 'segment'):
+            raise ValueError(f"sampling must be 'uniform' or 'segment', got {self.sampling!r}")
+
+        # Warning: check if segment_window is divisible by clip_len
+        if self.sampling == 'segment' and self.segment_window % self.clip_len != 0:
+            import warnings
+            warnings.warn(
+                f"segment_window={self.segment_window} is not divisible by "
+                f"clip_len={self.clip_len}; the last "
+                f"{self.segment_window % self.clip_len} frame(s) of the window "
+                "will never be sampled.",
+                stacklevel=2,
+            )
 
     def _load_annotations(self, ann_file):
         df = pd.read_csv(ann_file)
@@ -111,7 +125,7 @@ class KeyframeClipDataset(Dataset):
         total_frames = self._get_total_frames(sample['video_id'])
         if self.sampling == 'segment':
             frame_indices = self._sample_segment_indices(
-                sample['keyframe_id'], total_frames, is_train=self._is_train)
+                sample['keyframe_id'], total_frames, is_train=self.is_train)
         else:
             frame_indices = self._sample_frame_indices(
                 sample['keyframe_id'], total_frames)

@@ -22,15 +22,15 @@ class PilotDataModule(pl.LightningDataModule):
             clip_len=dc.clip_len, frame_interval=dc.frame_interval,
             jitter_range=dc.jitter_range,
             sampling=sampling, segment_window=segment_window,
+            is_train=True,
             transform=build_train_transforms(img_size=img_size))
         self.val_dataset = KeyframeClipDataset(
             ann_file=dc.val_ann, data_root=dc.root,
             clip_len=dc.clip_len, frame_interval=dc.frame_interval,
             jitter_range=0,
             sampling=sampling, segment_window=segment_window,
+            is_train=False,
             transform=build_val_transforms(img_size=img_size))
-        self.train_dataset._is_train = True
-        self.val_dataset._is_train = False
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.cfg.batch_size,
