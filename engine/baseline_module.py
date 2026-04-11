@@ -100,19 +100,51 @@ class _C3D(nn.Module):
         return self.classifier(x)
 
 
+def _remap_c3d_keys(state: dict) -> dict:
+    """Remap MMAction2 C3D Sports-1M keys to custom _C3D Sequential keys."""
+    mapping = {
+        'backbone.conv1a': 'features.0',
+        'backbone.conv2a': 'features.3',
+        'backbone.conv3a': 'features.6',
+        'backbone.conv3b': 'features.8',
+        'backbone.conv4a': 'features.11',
+        'backbone.conv4b': 'features.13',
+        'backbone.conv5a': 'features.16',
+        'backbone.conv5b': 'features.18',
+        'cls_head.fc1': 'classifier.2',
+        'cls_head.fc2': 'classifier.5',
+        'cls_head.fc_cls': 'classifier.8',
+    }
+    new_state = {}
+    for k, v in state.items():
+        new_key = k
+        for old_prefix, new_prefix in mapping.items():
+            if k.startswith(old_prefix + '.'):
+                new_key = new_prefix + k[len(old_prefix):]
+                break
+        new_state[new_key] = v
+    return new_state
+
+
 def _build_c3d(num_classes: int, pretrained: bool) -> nn.Module:
     """C3D (VGG-style, input 16×112×112).
 
-    pytorchvideo ≤ 0.1.5 does not ship a C3D module, so we use a built-in
-    implementation. pretrained=True would require an external checkpoint;
-    for CI (pretrained=False) the model is randomly initialised.
+    Uses custom _C3D since pytorchvideo ≤ 0.1.5 ships no C3D module.
+    When pretrained=True, loads Sports-1M weights from MMAction2 model zoo.
+    Backbone weights load cleanly; the classification head is randomly
+    initialised since num_classes differs from Sports-1M (487 classes).
     """
+    model = _C3D(num_classes=num_classes)
     if pretrained:
-        raise NotImplementedError(
-            "C3D pretrained loading is not implemented in this codebase "
-            "(pytorchvideo ≤ 0.1.5 has no create_c3d). Pass pretrained=False."
-        )
-    return _C3D(num_classes=num_classes)
+        url = ('https://download.openmmlab.com/mmaction/recognition/c3d/'
+               'c3d_sports1m_pretrain_20201016-dcc47ddc.pth')
+        ckpt = torch.hub.load_state_dict_from_url(url, map_location='cpu')
+        state = ckpt.get('state_dict', ckpt)
+        state = _remap_c3d_keys(state)
+        missing, unexpected = model.load_state_dict(state, strict=False)
+        if missing:
+            print(f"[C3D] Missing keys ({len(missing)}): {missing[:5]} ...")
+    return model
 
 
 def _build_i3d(num_classes: int, pretrained: bool) -> nn.Module:
