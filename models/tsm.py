@@ -49,6 +49,16 @@ class TemporalShift(nn.Module):
         return out.view(nt, c, h, w)
 
 
+class _TemporalShiftHook:
+    """Picklable pre-hook wrapper. Module-level class makes it pickle-safe for DDP."""
+
+    def __init__(self, shift: TemporalShift) -> None:
+        self.shift = shift
+
+    def __call__(self, module: nn.Module, inputs: tuple) -> tuple:
+        return (self.shift(inputs[0]),)
+
+
 def _insert_temporal_shift(backbone: nn.Module, n_segment: int,
                             n_div: int = 8) -> None:
     """Register TemporalShift pre-hooks on every Bottleneck block in-place."""
@@ -58,12 +68,7 @@ def _insert_temporal_shift(backbone: nn.Module, n_segment: int,
             # Register as a named submodule so it shows in named_modules()
             module.add_module('temporal_shift', shift)
 
-            def _make_hook(s: TemporalShift):
-                def hook(m, inputs):
-                    return (s(inputs[0]),)
-                return hook
-
-            module.register_forward_pre_hook(_make_hook(shift))
+            module.register_forward_pre_hook(_TemporalShiftHook(shift))
 
 
 class TSM(nn.Module):
@@ -95,6 +100,10 @@ class TSM(nn.Module):
             logits: (B, num_classes)
         """
         B, C, T, H, W = x.shape
+        assert T == self.num_segments, (
+            f"Input T={T} does not match num_segments={self.num_segments}. "
+            "Ensure clip_len in config matches num_segments."
+        )
         x = x.permute(0, 2, 1, 3, 4).contiguous()   # (B, T, C, H, W)
         x = x.view(B * T, C, H, W)
         x = self.backbone(x)                          # (B*T, 2048, h, w)
