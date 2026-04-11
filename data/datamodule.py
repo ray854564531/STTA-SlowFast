@@ -14,15 +14,24 @@ class PilotDataModule(pl.LightningDataModule):
         self.cfg = cfg.data
 
     def setup(self, stage=None):
+        dc = self.cfg
+        img_size = dc.get('img_size', 224)
+        sampling = dc.get('sampling', 'uniform')
+        segment_window = dc.get('segment_window', 64)
         self.train_dataset = KeyframeClipDataset(
-            ann_file=self.cfg.train_ann, data_root=self.cfg.root,
-            clip_len=self.cfg.clip_len, frame_interval=self.cfg.frame_interval,
-            jitter_range=self.cfg.jitter_range,
-            transform=build_train_transforms())
+            ann_file=dc.train_ann, data_root=dc.root,
+            clip_len=dc.clip_len, frame_interval=dc.frame_interval,
+            jitter_range=dc.jitter_range,
+            sampling=sampling, segment_window=segment_window,
+            transform=build_train_transforms(img_size=img_size))
         self.val_dataset = KeyframeClipDataset(
-            ann_file=self.cfg.val_ann, data_root=self.cfg.root,
-            clip_len=self.cfg.clip_len, frame_interval=self.cfg.frame_interval,
-            jitter_range=0, transform=build_val_transforms())
+            ann_file=dc.val_ann, data_root=dc.root,
+            clip_len=dc.clip_len, frame_interval=dc.frame_interval,
+            jitter_range=0,
+            sampling=sampling, segment_window=segment_window,
+            transform=build_val_transforms(img_size=img_size))
+        self.train_dataset._is_train = True
+        self.val_dataset._is_train = False
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.cfg.batch_size,
