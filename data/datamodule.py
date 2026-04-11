@@ -1,5 +1,4 @@
 """LightningDataModule for pilot cockpit dataset."""
-import torch
 import pytorch_lightning as pl
 
 _PIN_MEMORY = False
