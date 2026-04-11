@@ -184,6 +184,8 @@ class BaselineLightningModule(pl.LightningModule):
         )
         warmup_epochs = self._warmup_epochs
         start_factor = self._warmup_start_factor
+        # Cosine period fixed at 160 to match mmaction2 SlowFast config,
+        # consistent with SlowFastSTTALightningModule.
 
         def lr_lambda(epoch: int) -> float:
             cosine = 0.5 * (1.0 + math.cos(math.pi * epoch / 160))

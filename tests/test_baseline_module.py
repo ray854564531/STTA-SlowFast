@@ -56,3 +56,17 @@ def test_configure_optimizers_returns_dict():
     result = module.configure_optimizers()
     assert 'optimizer' in result
     assert 'lr_scheduler' in result
+
+
+def test_invalid_model_type_raises():
+    cfg = _make_cfg('nonexistent')
+    with pytest.raises(ValueError, match="Unknown model_type"):
+        BaselineLightningModule(cfg)
+
+
+def test_validation_step_runs():
+    cfg = _make_cfg('tsn')
+    module = BaselineLightningModule(cfg)
+    x = torch.randn(2, 3, 8, 224, 224)
+    y = torch.tensor([0, 3])
+    module.validation_step((x, y), batch_idx=0)  # must not raise
