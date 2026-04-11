@@ -56,3 +56,42 @@ def test_dataset_no_jitter(fake_dataset):
                               clip_len=16, frame_interval=1, jitter_range=0)
     frames, _ = ds[0]
     assert len(frames) == 16
+
+
+def test_segment_sampling_returns_correct_count(fake_dataset):
+    frames_dir, ann_file = fake_dataset
+    ds = KeyframeClipDataset(
+        ann_file=ann_file, data_root=frames_dir,
+        clip_len=8, frame_interval=1,
+        sampling='segment', segment_window=32)
+    frames_list, _ = ds[0]
+    # without transform, __getitem__ returns a list of 8 PIL images
+    assert len(frames_list) == 8
+
+
+def test_segment_sampling_indices_span_window(fake_dataset):
+    """Each of the 8 segments should contribute exactly one index."""
+    frames_dir, ann_file = fake_dataset
+    ds = KeyframeClipDataset(
+        ann_file=ann_file, data_root=frames_dir,
+        clip_len=8, frame_interval=1,
+        sampling='segment', segment_window=32, jitter_range=0)
+    # keyframe=50, window=32 → [34..65], 8 segs of 4 frames each
+    indices = ds._sample_segment_indices(
+        keyframe_id=50, total_frames=100, is_train=False)
+    assert len(indices) == 8
+    # val: deterministic middle of each segment, must be sorted
+    assert indices == sorted(indices)
+
+
+def test_segment_shape_with_transform(fake_dataset):
+    from data.transforms import build_val_transforms
+    frames_dir, ann_file = fake_dataset
+    ds = KeyframeClipDataset(
+        ann_file=ann_file, data_root=frames_dir,
+        clip_len=8, frame_interval=1,
+        sampling='segment', segment_window=32,
+        transform=build_val_transforms(img_size=224))
+    frames, label = ds[0]
+    # transform stacks: (C, T, H, W) = (3, 8, 224, 224)
+    assert frames.shape == (3, 8, 224, 224)
