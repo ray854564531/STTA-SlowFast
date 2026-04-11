@@ -40,6 +40,10 @@ class TSN(nn.Module):
             logits: (B, num_classes)
         """
         B, C, T, H, W = x.shape
+        assert T == self.num_segments, (
+            f"Input T={T} does not match num_segments={self.num_segments}. "
+            "Ensure clip_len in config matches num_segments."
+        )
         # Fold time into batch
         x = x.permute(0, 2, 1, 3, 4).contiguous()   # (B, T, C, H, W)
         x = x.view(B * T, C, H, W)
