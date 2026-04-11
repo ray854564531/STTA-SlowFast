@@ -1,0 +1,13 @@
+_base_: base.yaml
+
+model:
+  type: i3d
+  pretrained: true
+
+data:
+  clip_len: 8
+  img_size: 224
+  sampling: uniform
+
+logging:
+  wandb_name: i3d

@@ -56,12 +56,16 @@ def model_factory(model_type: str, cfg: Config) -> nn.Module:
 
 
 class _C3D(nn.Module):
-    """VGG-style C3D network (input: B x 3 x 16 x 112 x 112).
+    """VGG-style C3D network (input: B x 3 x T x 112 x 112).
 
     Architecture follows the original Tran et al. 2015 paper:
     5 conv blocks with max-pool, then two FC layers before the classifier.
-    Supports pretrained=False (random init) only; pretrained loading is
-    left as a future extension since pytorchvideo ≤ 0.1.5 ships no C3D.
+    Uses AdaptiveAvgPool3d(1) before the FC layers so it accepts variable
+    clip lengths (not fixed to 16 frames).
+
+    When pretrained=True, backbone conv weights are loaded from the
+    MMAction2 Sports-1M checkpoint; the classification head is randomly
+    initialised since its shape differs from Sports-1M (487 classes).
     """
 
     def __init__(self, num_classes: int) -> None:
@@ -101,7 +105,13 @@ class _C3D(nn.Module):
 
 
 def _remap_c3d_keys(state: dict) -> dict:
-    """Remap MMAction2 C3D Sports-1M keys to custom _C3D Sequential keys."""
+    """Remap MMAction2 C3D Sports-1M backbone keys to custom _C3D Sequential keys.
+
+    Only backbone conv layers are mapped; the fc head keys are intentionally
+    excluded because MMAction2's Sports-1M fc1 shape (4096, 8192) is
+    incompatible with our AdaptiveAvgPool3d-based classifier.2 (4096, 512).
+    The classification head is randomly initialised for the target num_classes.
+    """
     mapping = {
         'backbone.conv1a': 'features.0',
         'backbone.conv2a': 'features.3',
@@ -111,9 +121,6 @@ def _remap_c3d_keys(state: dict) -> dict:
         'backbone.conv4b': 'features.13',
         'backbone.conv5a': 'features.16',
         'backbone.conv5b': 'features.18',
-        'cls_head.fc1': 'classifier.2',
-        'cls_head.fc2': 'classifier.5',
-        'cls_head.fc_cls': 'classifier.8',
     }
     new_state = {}
     for k, v in state.items():
@@ -127,12 +134,13 @@ def _remap_c3d_keys(state: dict) -> dict:
 
 
 def _build_c3d(num_classes: int, pretrained: bool) -> nn.Module:
-    """C3D (VGG-style, input 16×112×112).
+    """C3D (VGG-style, input T×112×112, AdaptiveAvgPool3d variant).
 
     Uses custom _C3D since pytorchvideo ≤ 0.1.5 ships no C3D module.
-    When pretrained=True, loads Sports-1M weights from MMAction2 model zoo.
-    Backbone weights load cleanly; the classification head is randomly
-    initialised since num_classes differs from Sports-1M (487 classes).
+    When pretrained=True, loads Sports-1M backbone weights from MMAction2
+    model zoo (backbone conv layers only; fc head excluded due to shape
+    mismatch — MMAction2 fc1 is 4096×8192, ours is 4096×512).
+    The classification head is randomly initialised for num_classes.
     """
     model = _C3D(num_classes=num_classes)
     if pretrained:

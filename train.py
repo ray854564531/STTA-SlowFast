@@ -17,7 +17,10 @@ from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger
 
 from data.datamodule import PilotDataModule
 from engine.module import SlowFastSTTALightningModule
+from engine.baseline_module import BaselineLightningModule
 from utils.config import load_config
+
+_BASELINE_TYPES = {'tsn', 'tsm', 'c3d', 'i3d', 'r2plus1d'}
 
 
 def parse_args():
@@ -49,7 +52,11 @@ def main():
     cfg = load_config(args.config)
     pl.seed_everything(cfg.train.get('seed', 42))
 
-    module = SlowFastSTTALightningModule(cfg)
+    model_type = cfg.model.get('type', None)
+    if model_type in _BASELINE_TYPES:
+        module = BaselineLightningModule(cfg)
+    else:
+        module = SlowFastSTTALightningModule(cfg)
     datamodule = PilotDataModule(cfg)
 
     ckpt_dir = f'work_dirs/{os.path.splitext(os.path.basename(args.config))[0]}'

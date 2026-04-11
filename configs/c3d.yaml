@@ -1,0 +1,13 @@
+_base_: base.yaml
+
+model:
+  type: c3d
+  pretrained: true
+
+data:
+  clip_len: 16
+  img_size: 112
+  sampling: uniform
+
+logging:
+  wandb_name: c3d

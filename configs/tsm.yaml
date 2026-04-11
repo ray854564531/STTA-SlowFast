@@ -1,0 +1,14 @@
+_base_: base.yaml
+
+model:
+  type: tsm
+  pretrained: true
+
+data:
+  clip_len: 8
+  img_size: 224
+  sampling: segment
+  segment_window: 64
+
+logging:
+  wandb_name: tsm
