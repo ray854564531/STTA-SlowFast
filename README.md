@@ -4,6 +4,11 @@
 
 ## 核心方法
 
+项目包含两类模型：
+
+- **SlowFast + STTA**（主方法）：在 SlowFast backbone 上插入时空三重注意力，支持消融实验
+- **Baseline 对比模型**：TSN、TSM、C3D、I3D、R(2+1)D，通过同一 `train.py` 入口运行
+
 **ST-TripletAttention (STTA)** 在 SlowFast 的 fast pathway 每个 stage 之后插入三路注意力分支：
 
 | 分支 | 建模维度 | 压缩维度 |
@@ -18,7 +23,7 @@
 
 ```
 pilot_project/
-├── train.py                  # 训练入口
+├── train.py                  # 训练入口（SlowFast + STTA / baseline 统一入口）
 ├── configs/
 │   ├── base.yaml             # 公共超参数
 │   ├── slowfast_stta_reproduce.yaml  # 复现 94.84%（2 GPU × bs8）
@@ -29,23 +34,31 @@ pilot_project/
 │   ├── ablation_thw_only.yaml    # 消融：仅 T-H-W
 │   ├── ablation_tcw_tch.yaml     # 消融：T-C-W + T-C-H
 │   ├── ablation_tcw_thw.yaml     # 消融：T-C-W + T-H-W
-│   └── ablation_tch_thw.yaml     # 消融：T-C-H + T-H-W
+│   ├── ablation_tch_thw.yaml     # 消融：T-C-H + T-H-W
+│   ├── tsn.yaml              # TSN baseline（8 段，segment 采样）
+│   ├── tsm.yaml              # TSM baseline（8 段，segment 采样）
+│   ├── c3d.yaml              # C3D baseline（16 帧，112×112）
+│   ├── i3d.yaml              # I3D baseline（32 帧，224×224）
+│   └── r2plus1d.yaml         # R(2+1)D baseline（8 帧，224×224）
 ├── models/
 │   ├── attention.py          # STTripletAttention 模块
 │   ├── resnet3d.py           # ResNet3d 基础块
 │   ├── slowfast.py           # ResNet3dSlowFast backbone
 │   ├── slowfast_stta.py      # SlowFastWithSTTA（主模型）
 │   ├── head.py               # SlowFastHead 分类头
-│   └── conv_utils.py         # ConvModule
+│   ├── conv_utils.py         # ConvModule
+│   ├── tsn.py                # TSN（ResNet-50 + 时序 consensus）
+│   └── tsm.py                # TSM（ResNet-50 + temporal shift）
 ├── engine/
-│   └── module.py             # LightningModule（训练/验证逻辑）
+│   ├── module.py             # SlowFastSTTALightningModule
+│   └── baseline_module.py    # BaselineLightningModule（TSN/TSM/C3D/I3D/R(2+1)D）
 ├── data/
-│   ├── dataset.py            # KeyframeClipDataset
+│   ├── dataset.py            # KeyframeClipDataset（支持 uniform / segment 采样）
 │   ├── datamodule.py         # LightningDataModule
 │   └── transforms.py         # 多帧一致性数据增强
 ├── utils/
 │   └── metrics.py            # top-k accuracy
-└── tests/                    # pytest 测试（28 个）
+└── tests/                    # pytest 测试（49 个）
 ```
 
 ## 环境要求
@@ -101,6 +114,13 @@ uv run train.py --config configs/slowfast_baseline.yaml
 # 消融实验（示例）
 uv run train.py --config configs/ablation_tcw_only.yaml
 uv run train.py --config configs/ablation_tch_thw.yaml
+
+# Baseline 对比模型
+uv run train.py --config configs/tsn.yaml
+uv run train.py --config configs/tsm.yaml
+uv run train.py --config configs/c3d.yaml
+uv run train.py --config configs/i3d.yaml
+uv run train.py --config configs/r2plus1d.yaml
 ```
 
 多 GPU 训练通过 YAML 中的 `trainer.devices` 和 `trainer.strategy` 字段控制，无需修改代码：
@@ -146,11 +166,25 @@ WANDB_MODE=offline uv run train.py --config configs/slowfast_stta_full.yaml
 
 ## 模型架构细节
 
+### SlowFast + STTA
+
 - Slow pathway: `base_channels=64`, `conv1_kernel=(1,7,7)`, `inflate=(0,0,1,1)`
 - Fast pathway: `base_channels=8`, `conv1_kernel=(5,7,7)`, `inflate=(1,1,1,1)`
 - STTA 插入位置：fast pathway 每个 stage 之后（共 4 个位置，均可独立开关）
 - Lateral connection 使用 STTA 增强后的 fast 特征
 - 分类头输入维度：`2304`（slow 2048 + fast 256）
+
+### Baseline 对比模型
+
+| 模型 | Backbone | 预训练权重 | 输入尺寸 | 采样方式 |
+|------|----------|-----------|---------|---------|
+| TSN | ResNet-50 | ImageNet | 8 段 × 224×224 | segment（每段随机/中间帧） |
+| TSM | ResNet-50 + temporal shift | ImageNet | 8 段 × 224×224 | segment |
+| C3D | VGG-style 3D CNN | Sports-1M（backbone only） | 16×112×112 | uniform |
+| I3D | ResNet-50 3D | Kinetics-400 | 32×224×224 | uniform |
+| R(2+1)D | ResNet-50 (2+1)D | Kinetics-400 | 8×224×224 | uniform |
+
+所有 baseline 使用 `lr=0.01`，`max_epochs=100`（相比 SlowFast 的 `lr=0.1`、`150 epoch`）。
 
 ## 测试
 
@@ -159,4 +193,4 @@ cd pilot_project
 uv run -- python -m pytest tests/ -v
 ```
 
-共 28 个测试，覆盖：模型前向传播、训练步骤、各消融组合、端到端数据流。
+共 49 个测试，覆盖：SlowFast+STTA 模型前向传播、训练步骤、各消融组合、端到端数据流、TSN/TSM/C3D/I3D/R(2+1)D baseline 模型前向传播与训练逻辑。
