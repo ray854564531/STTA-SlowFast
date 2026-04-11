@@ -10,5 +10,11 @@ data:
   sampling: segment
   segment_window: 64
 
+train:
+  lr: 0.01
+  warmup_epochs: 5
+  warmup_start_factor: 0.1
+  max_epochs: 100
+
 logging:
-  wandb_name: tsm
+  wandb_name: tsm_baseline

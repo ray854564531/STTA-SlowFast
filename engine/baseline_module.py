@@ -90,7 +90,8 @@ class _C3D(nn.Module):
             nn.Conv3d(512, 512, kernel_size=3, padding=1), nn.ReLU(inplace=True),
             nn.MaxPool3d(kernel_size=2, stride=2),
         )
-        # After pooling: T=16→16→8→4→2→1, H/W=112→56→28→14→7→3 (floor)
+        # AdaptiveAvgPool3d(1) collapses any T×H×W to 1×1×1, so input
+        # clip length and spatial size are not fixed by the conv stack.
         self.classifier = nn.Sequential(
             nn.AdaptiveAvgPool3d(1),
             nn.Flatten(),
