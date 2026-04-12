@@ -10,7 +10,7 @@ Forward:
 """
 import torch
 import torch.nn as nn
-from torchvision.models import resnet50, ResNet50_Weights
+from torchvision.models import resnet50
 
 
 class TSN(nn.Module):
@@ -26,8 +26,10 @@ class TSN(nn.Module):
                  pretrained: bool = True) -> None:
         super().__init__()
         self.num_segments = num_segments
-        weights = ResNet50_Weights.IMAGENET1K_V1 if pretrained else None
-        backbone = resnet50(weights=weights)
+        backbone = resnet50(weights=None)
+        if pretrained:
+            state = torch.load('./checkpoints/resnet50-0676ba61.pth', map_location='cpu')
+            backbone.load_state_dict(state)
         # Remove avgpool and fc; keep everything up to layer4
         self.features = nn.Sequential(*list(backbone.children())[:-2])  # → (B*T,2048,h,w)
         self.pool = nn.AdaptiveAvgPool2d(1)

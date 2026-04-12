@@ -145,9 +145,7 @@ def _build_c3d(num_classes: int, pretrained: bool) -> nn.Module:
     """
     model = _C3D(num_classes=num_classes)
     if pretrained:
-        url = ('https://download.openmmlab.com/mmaction/recognition/c3d/'
-               'c3d_sports1m_pretrain_20201016-dcc47ddc.pth')
-        ckpt = torch.hub.load_state_dict_from_url(url, map_location='cpu')
+        ckpt = torch.load('./checkpoints/c3d_sports1m_pretrain_20201016-dcc47ddc.pth', map_location='cpu')
         state = ckpt.get('state_dict', ckpt)
         state = _remap_c3d_keys(state)
         missing, unexpected = model.load_state_dict(state, strict=False)
@@ -160,7 +158,10 @@ def _build_i3d(num_classes: int, pretrained: bool) -> nn.Module:
     """I3D ResNet-50 with Kinetics-400 pretrained weights via pytorchvideo hub."""
     model = torch.hub.load(
         'facebookresearch/pytorchvideo:main', 'i3d_r50',
-        pretrained=pretrained)
+        pretrained=False)
+    if pretrained:
+        ckpt = torch.load('./checkpoints/I3D_8x8_R50.pyth', map_location='cpu')
+        model.load_state_dict(ckpt['model_state'])
     in_features = model.blocks[-1].proj.in_features
     model.blocks[-1].proj = nn.Linear(in_features, num_classes)
     return model
@@ -170,7 +171,10 @@ def _build_r2plus1d(num_classes: int, pretrained: bool) -> nn.Module:
     """R(2+1)D ResNet-50 with Kinetics-400 pretrained weights via pytorchvideo hub."""
     model = torch.hub.load(
         'facebookresearch/pytorchvideo:main', 'r2plus1d_r50',
-        pretrained=pretrained)
+        pretrained=False)
+    if pretrained:
+        ckpt = torch.load('./checkpoints/R2PLUS1D_16x4_R50.pyth', map_location='cpu')
+        model.load_state_dict(ckpt['model_state'])
     in_features = model.blocks[-1].proj.in_features
     model.blocks[-1].proj = nn.Linear(in_features, num_classes)
     return model

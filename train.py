@@ -34,17 +34,18 @@ def build_loggers(cfg, config_path: str):
     loggers = []
     lc = cfg.get('logging', None)
     if lc is None:
-        return loggers
+        return loggers, None
 
     config_name = os.path.splitext(os.path.basename(config_path))[0]
     wandb_run_name = lc.get('wandb_name', None) or config_name
 
     wandb_project = lc.get('wandb_project', 'pilot-action-recognition')
     wandb_mode = lc.get('wandb_mode', 'online')
+    tb_logger = TensorBoardLogger(save_dir='logs/tb', name=config_name)
     if wandb_mode != 'disabled':
         loggers.append(WandbLogger(project=wandb_project, name=wandb_run_name, mode=wandb_mode))
-    loggers.append(TensorBoardLogger(save_dir='logs/tb', name=config_name))
-    return loggers
+    loggers.append(tb_logger)
+    return loggers, tb_logger
 
 
 def main():
@@ -59,7 +60,11 @@ def main():
         module = SlowFastSTTALightningModule(cfg)
     datamodule = PilotDataModule(cfg)
 
-    ckpt_dir = f'work_dirs/{os.path.splitext(os.path.basename(args.config))[0]}'
+    loggers, tb_logger = build_loggers(cfg, args.config)
+
+    config_name = os.path.splitext(os.path.basename(args.config))[0]
+    version = f'version_{tb_logger.version}' if tb_logger is not None else 'version_0'
+    ckpt_dir = os.path.join('work_dirs', config_name, version)
     os.makedirs(ckpt_dir, exist_ok=True)
     with open(os.path.join(ckpt_dir, 'config.yaml'), 'w') as f:
         yaml.dump(cfg.to_dict(), f, default_flow_style=False, allow_unicode=True)
@@ -74,8 +79,6 @@ def main():
         save_last=True,
     )
     lr_monitor = LearningRateMonitor(logging_interval='epoch')
-
-    loggers = build_loggers(cfg, args.config)
 
     val_check = cfg.logging.get('val_check_interval', 2)
     trainer_cfg = cfg.get('trainer', None)

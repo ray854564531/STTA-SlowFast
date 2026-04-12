@@ -11,7 +11,7 @@ Input shape: (B, C, T, H, W) — matches the project's DataLoader output.
 """
 import torch
 import torch.nn as nn
-from torchvision.models import resnet50, ResNet50_Weights
+from torchvision.models import resnet50
 from torchvision.models.resnet import Bottleneck
 
 
@@ -85,8 +85,10 @@ class TSM(nn.Module):
                  pretrained: bool = True, n_div: int = 8) -> None:
         super().__init__()
         self.num_segments = num_segments
-        weights = ResNet50_Weights.IMAGENET1K_V1 if pretrained else None
-        backbone = resnet50(weights=weights)
+        backbone = resnet50(weights=None)
+        if pretrained:
+            state = torch.load('./checkpoints/resnet50-0676ba61.pth', map_location='cpu')
+            backbone.load_state_dict(state)
         # Remove avgpool and fc
         self.backbone = nn.Sequential(*list(backbone.children())[:-2])
         _insert_temporal_shift(self.backbone, n_segment=num_segments, n_div=n_div)
