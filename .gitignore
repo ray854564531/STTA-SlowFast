@@ -17,3 +17,7 @@ work_dirs
 
 # env
 uv.lock
+pyproject.toml
+
+# configs
+configs
