@@ -146,6 +146,21 @@ logging:
 WANDB_MODE=offline uv run train.py --config configs/slowfast_stta_full.yaml
 ```
 
+**TensorBoard 查看训练日志**：每次训练会在 `lightning_logs/` 目录下生成 TensorBoard 事件文件，可用以下命令启动本地服务：
+
+```bash
+# 查看所有实验（默认端口 6006）
+uv run -- tensorboard --logdir logs/tb/
+
+# 指定端口（多实验对比时可开多个）
+uv run -- tensorboard --logdir logs/tb/ --port 6007
+
+# 只查看某次具体实验
+uv run -- tensorboard --logdir logs/tb/stta_slowfast_fast_only/version_0/
+```
+
+启动后访问 `http://localhost:6006` 即可查看 loss、accuracy 等曲线。
+
 ## 关键超参数（base.yaml）
 
 | 参数 | 值 |

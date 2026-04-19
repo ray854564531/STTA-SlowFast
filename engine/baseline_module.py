@@ -114,20 +114,26 @@ def _remap_c3d_keys(state: dict) -> dict:
     The classification head is randomly initialised for the target num_classes.
     """
     mapping = {
-        'backbone.conv1a': 'features.0',
-        'backbone.conv2a': 'features.3',
-        'backbone.conv3a': 'features.6',
-        'backbone.conv3b': 'features.8',
-        'backbone.conv4a': 'features.11',
-        'backbone.conv4b': 'features.13',
-        'backbone.conv5a': 'features.16',
-        'backbone.conv5b': 'features.18',
+        'conv1a': 'features.0',
+        'conv2a': 'features.3',
+        'conv3a': 'features.6',
+        'conv3b': 'features.8',
+        'conv4a': 'features.11',
+        'conv4b': 'features.13',
+        'conv5a': 'features.16',
+        'conv5b': 'features.18',
     }
     new_state = {}
     for k, v in state.items():
         new_key = k
         for old_prefix, new_prefix in mapping.items():
-            if k.startswith(old_prefix + '.'):
+            # MMAction2 ConvModule stores Conv3d as .conv sub-module:
+            # e.g. backbone.conv1a.conv.weight → features.0.weight
+            if k.startswith(old_prefix + '.conv.'):
+                new_key = new_prefix + k[len(old_prefix + '.conv'):]
+                break
+            # Fallback: plain Conv3d (no ConvModule wrapper)
+            elif k.startswith(old_prefix + '.'):
                 new_key = new_prefix + k[len(old_prefix):]
                 break
         new_state[new_key] = v
@@ -155,10 +161,9 @@ def _build_c3d(num_classes: int, pretrained: bool) -> nn.Module:
 
 
 def _build_i3d(num_classes: int, pretrained: bool) -> nn.Module:
-    """I3D ResNet-50 with Kinetics-400 pretrained weights via pytorchvideo hub."""
-    model = torch.hub.load(
-        'facebookresearch/pytorchvideo:main', 'i3d_r50',
-        pretrained=False)
+    """I3D ResNet-50 with Kinetics-400 pretrained weights loaded from local checkpoint."""
+    from pytorchvideo.models.hub import i3d_r50
+    model = i3d_r50(pretrained=False)
     if pretrained:
         ckpt = torch.load('./checkpoints/I3D_8x8_R50.pyth', map_location='cpu')
         model.load_state_dict(ckpt['model_state'])
@@ -168,10 +173,9 @@ def _build_i3d(num_classes: int, pretrained: bool) -> nn.Module:
 
 
 def _build_r2plus1d(num_classes: int, pretrained: bool) -> nn.Module:
-    """R(2+1)D ResNet-50 with Kinetics-400 pretrained weights via pytorchvideo hub."""
-    model = torch.hub.load(
-        'facebookresearch/pytorchvideo:main', 'r2plus1d_r50',
-        pretrained=False)
+    """R(2+1)D ResNet-50 with Kinetics-400 pretrained weights loaded from local checkpoint."""
+    from pytorchvideo.models.hub import r2plus1d_r50
+    model = r2plus1d_r50(pretrained=False)
     if pretrained:
         ckpt = torch.load('./checkpoints/R2PLUS1D_16x4_R50.pyth', map_location='cpu')
         model.load_state_dict(ckpt['model_state'])
@@ -196,6 +200,10 @@ class BaselineLightningModule(pl.LightningModule):
         model_type = cfg.model.get('type', 'tsn')
         self.model = model_factory(model_type, cfg)
         self.criterion = nn.CrossEntropyLoss()
+        dc = cfg.data
+        self.example_input_array = torch.zeros(
+            1, 3, dc.get('clip_len', 8),
+            dc.get('crop_size', 224), dc.get('crop_size', 224))
         self._warmup_epochs = tc.warmup_epochs
         self._warmup_start_factor = tc.warmup_start_factor
         self._max_epochs = tc.max_epochs

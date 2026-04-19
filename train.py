@@ -11,7 +11,7 @@ import torch
 import yaml
 import pytorch_lightning as pl
 
-torch.set_float32_matmul_precision('highest')
+torch.set_float32_matmul_precision('high')
 from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from pytorch_lightning.loggers import WandbLogger, TensorBoardLogger
 

@@ -14,10 +14,7 @@ logs
 
 # works
 work_dirs
-
-# env
-uv.lock
-pyproject.toml
+stta_data
 
 # configs
 configs
