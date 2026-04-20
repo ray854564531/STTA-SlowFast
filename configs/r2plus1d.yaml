@@ -1,0 +1,21 @@
+_base_: base.yaml
+
+model:
+  type: r2plus1d
+  pretrained: true
+
+data:
+  clip_len: 16   # must be 16: R2PLUS1D_16x4_R50 checkpoint uses AvgPool3d(4,7,7) head;
+                 # 8-frame input reduces T to 2 before head, causing RuntimeError (T:2 < kT:4)
+  img_size: 224  # must be 224: r2plus1d_r50 uses AvgPool3d(4,7,7) spatial kernel;
+                 # 112px input leaves spatial dim < 7 after backbone, causing RuntimeError
+  sampling: uniform
+
+train:
+  lr: 0.01
+  warmup_epochs: 5
+  warmup_start_factor: 0.1
+  max_epochs: 100
+
+logging:
+  wandb_name: r2plus1d_baseline

@@ -1,0 +1,23 @@
+# Fallback for users who don't use uv.
+# Recommended: `uv sync` (uses pinned versions from uv.lock).
+#
+# Install torch/torchvision first (pick the CUDA build that matches your system):
+#   pip install torch==2.7.1 torchvision==0.22.1 --index-url https://download.pytorch.org/whl/cu118
+# Then:
+#   pip install -r requirements.txt
+
+torch==2.7.1
+torchvision==0.22.1
+pytorch-lightning>=2.0.0
+pytorchvideo>=0.1.5
+wandb
+tensorboard
+pyyaml
+pandas
+pillow
+einops
+rich
+
+# dev
+pytest
+pytest-cov

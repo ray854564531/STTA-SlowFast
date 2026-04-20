@@ -1,0 +1,6 @@
+_base_: base.yaml
+model:
+  fast_stta_stages: [true, true, true, true]
+  enable_tcw: false
+logging:
+  wandb_name: ablation_tch_thw

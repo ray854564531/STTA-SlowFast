@@ -1,0 +1,5 @@
+_base_: base.yaml
+model:
+  slow_stta_stages: [true, true, true, true]
+logging:
+  wandb_name: stta_slow_only

@@ -1,6 +1,15 @@
 # Pilot Project — SlowFast + ST-TripletAttention
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch 2.x](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
+[![Lightning](https://img.shields.io/badge/Lightning-2.x-792EE5?logo=lightning&logoColor=white)](https://lightning.ai/)
+[![uv](https://img.shields.io/badge/packaged%20with-uv-DE5FE9)](https://github.com/astral-sh/uv)
+[![Tests](https://img.shields.io/badge/tests-49%20passed-brightgreen.svg)](tests/)
+
 在驾驶舱飞行员动作识别数据集上对比 SlowFast baseline 与 SlowFast+STTA（时空三重注意力）的效果，并支持消融实验。
+
+项目地址：<https://github.com/ray854564531/STTA-SlowFast>
 
 ## 核心方法
 
@@ -69,7 +78,15 @@ pilot_project/
 
 ```bash
 cd pilot_project
-uv sync          # 安装依赖
+uv sync          # 推荐方式（使用 uv.lock 锁定版本）
+```
+
+不使用 uv 的用户可退回 pip：
+
+```bash
+# 先安装匹配本机 CUDA 的 torch（示例为 CUDA 11.8）
+pip install torch==2.7.1 torchvision==0.22.1 --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt
 ```
 
 ## 数据准备
@@ -209,3 +226,7 @@ uv run -- python -m pytest tests/ -v
 ```
 
 共 49 个测试，覆盖：SlowFast+STTA 模型前向传播、训练步骤、各消融组合、端到端数据流、TSN/TSM/C3D/I3D/R(2+1)D baseline 模型前向传播与训练逻辑。
+
+## License
+
+本项目采用 [MIT License](LICENSE) 开源。你可以自由使用、修改、分发本项目的代码，但需保留原版权声明。
