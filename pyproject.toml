@@ -15,6 +15,7 @@ dependencies = [
     "einops",
     "rich",
     "pytorchvideo>=0.1.5",
+    "decord>=0.6",
 ]
 
 [tool.pytest.ini_options]
@@ -26,6 +27,8 @@ filterwarnings = [
 dev = [
     "pytest",
     "pytest-cov",
+    "imageio-ffmpeg",
+    "imageio",
 ]
 
 [[tool.uv.index]]
