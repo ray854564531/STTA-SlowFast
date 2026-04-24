@@ -1,0 +1,55 @@
+model:
+  type: slowfast_stta
+  resample_rate: 4
+  speed_ratio: 4
+  channel_ratio: 8
+  kernel_size: 7
+  fast_stta_stages: [true, true, true, true]
+  slow_stta_stages: [false, false, false, false]
+  enable_stta: true
+  enable_tcw: true
+  enable_tch: true
+  enable_thw: true
+  dropout: 0.5
+
+data:
+  type: kinetics
+  root: ../data/kinetics400
+  num_classes: 400
+  clip_len: 32
+  frame_interval: 2
+  img_size: 224
+  short_side_scale_train: [256, 320]
+  short_side_scale_eval: 256
+  mean: [0.45, 0.45, 0.45]
+  std: [0.225, 0.225, 0.225]
+  batch_size: 8
+  num_workers: 8
+  decode_backend: decord
+
+train:
+  seed: 42
+  lr: 0.1
+  momentum: 0.9
+  weight_decay: 1.0e-4
+  warmup_epochs: 5
+  warmup_start_factor: 0.1
+  max_epochs: 100
+  grad_clip: 40
+
+test:
+  enabled: true
+  num_clips: 10
+  num_crops: 3
+  batch_size: 1
+
+logging:
+  wandb_project: pilot-action-recognition
+  wandb_mode: online
+  save_top_k: 3
+  val_check_interval: 2
+  log_every_n_steps: 50
+
+trainer:
+  devices: 1
+  strategy: auto
