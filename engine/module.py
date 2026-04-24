@@ -99,6 +99,21 @@ class SlowFastSTTALightningModule(pl.LightningModule):
             self.log('val/acc1', acc1, on_epoch=True, prog_bar=True, sync_dist=True)
             self.log('val/acc5', acc5, on_epoch=True, sync_dist=True)
 
+    def test_step(self, batch, batch_idx: int) -> None:
+        clips, y = batch                                    # (B, N, C, T, H, W)
+        B, N = clips.shape[:2]
+        flat = clips.reshape(B * N, *clips.shape[2:])
+        logits = self(flat)
+        probs = logits.softmax(-1).reshape(B, N, -1).mean(dim=1)
+        mask = y >= 0
+        if mask.any():
+            acc1 = top_k_accuracy(probs[mask], y[mask], k=1)
+            acc5 = top_k_accuracy(probs[mask], y[mask],
+                                   k=min(5, probs.size(1)))
+            if self._trainer is not None:
+                self.log('test/acc1', acc1, on_epoch=True, prog_bar=True, sync_dist=True)
+                self.log('test/acc5', acc5, on_epoch=True, sync_dist=True)
+
     def configure_optimizers(self):
         tc = self.cfg.train
         optimizer = SGD(
