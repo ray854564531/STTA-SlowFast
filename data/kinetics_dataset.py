@@ -96,6 +96,18 @@ class KineticsVideoDataset(Dataset):
         span = self.clip_len * self.frame_interval
         return max(0, (total_frames - span) // 2)
 
+    def _sample_test_starts(self, total_frames: int) -> List[int]:
+        span = self.clip_len * self.frame_interval
+        if self.num_clips == 1:
+            return [self._center_start(total_frames)]
+        if total_frames <= span:
+            return [0] * self.num_clips
+        max_start = total_frames - span
+        return [
+            int(round(i * max_start / (self.num_clips - 1)))
+            for i in range(self.num_clips)
+        ]
+
     def _sample_val_indices(self, total_frames: int) -> np.ndarray:
         span = self.clip_len * self.frame_interval
         if total_frames >= span:
@@ -114,7 +126,9 @@ class KineticsVideoDataset(Dataset):
             return self._get_train(path, label)
         if self.mode == 'val':
             return self._get_val(path, label)
-        raise NotImplementedError(f'mode={self.mode!r} not yet implemented')
+        if self.mode == 'test':
+            return self._get_test(path, label)
+        raise ValueError(f'Unknown mode: {self.mode!r}')
 
     def _get_train(self, path: str, label: int):
         vr = self._decord_reader(path)
@@ -136,3 +150,23 @@ class KineticsVideoDataset(Dataset):
         if self.transform is not None:
             clip = self.transform(clip)
         return clip, label
+
+    def _get_test(self, path: str, label: int):
+        vr = self._decord_reader(path)
+        total = len(vr)
+        starts = self._sample_test_starts(total)
+        span = self.clip_len * self.frame_interval
+        all_views = []
+        for start in starts:
+            if total >= span:
+                idx = np.arange(start, start + span, self.frame_interval)
+            else:
+                idx = (np.arange(self.clip_len) * self.frame_interval) % total
+            idx = np.clip(idx.astype(np.int64), 0, total - 1)
+            frames = torch.from_numpy(vr.get_batch(idx).asnumpy())
+            out = self.transform(frames) if self.transform is not None else frames
+            if isinstance(out, (list, tuple)):
+                all_views.extend(out)
+            else:
+                all_views.append(out)
+        return torch.stack(all_views, dim=0), label

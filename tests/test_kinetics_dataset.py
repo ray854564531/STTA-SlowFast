@@ -86,3 +86,25 @@ def test_val_getitem_shape_and_determinism(k400_tree):
     assert clip1.shape == (3, 8, 224, 224)
     assert label1 == label2
     assert torch.equal(clip1, clip2)
+
+
+from data.video_transforms import build_test_three_crop_transform
+
+
+def test_test_mode_30_view_shape(k400_tree):
+    tfm = build_test_three_crop_transform(256, 224, [0.45]*3, [0.225]*3)
+    ds = KineticsVideoDataset(root=k400_tree, split='val', mode='test',
+                               clip_len=8, frame_interval=2,
+                               num_clips=10, num_crops=3, transform=tfm)
+    clips, label = ds[0]
+    assert clips.shape == (30, 3, 8, 224, 224)
+    assert isinstance(label, int)
+
+
+def test_test_mode_single_crop(k400_tree):
+    tfm = build_val_video_transform(256, 224, [0.45]*3, [0.225]*3)
+    ds = KineticsVideoDataset(root=k400_tree, split='val', mode='test',
+                               clip_len=8, frame_interval=2,
+                               num_clips=5, num_crops=1, transform=tfm)
+    clips, _ = ds[0]
+    assert clips.shape == (5, 3, 8, 224, 224)
