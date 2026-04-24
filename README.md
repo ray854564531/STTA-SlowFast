@@ -1,5 +1,7 @@
 # Pilot Project — SlowFast + ST-TripletAttention
 
+**简体中文** | [English](README.en.md)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch 2.x](https://img.shields.io/badge/PyTorch-2.x-EE4C2C?logo=pytorch&logoColor=white)](https://pytorch.org/)
@@ -35,9 +37,9 @@ pilot_project/
 ├── train.py                  # 训练入口（SlowFast + STTA / baseline 统一入口）
 ├── configs/
 │   ├── base.yaml             # 公共超参数
-│   ├── slowfast_stta_reproduce.yaml  # 复现 94.84%（2 GPU × bs8）
-│   ├── slowfast_stta_full.yaml   # 主实验（全部 STTA，单 GPU）
-│   ├── slowfast_baseline.yaml    # 无注意力基线
+│   ├── stta_fast_only.yaml      # 主方法：fast pathway 全部 STTA（最佳模型）
+│   ├── stta_slow_only.yaml      # 对照：slow pathway 全部 STTA
+│   ├── slowfast_baseline.yaml   # 无注意力基线
 │   ├── ablation_tcw_only.yaml    # 消融：仅 T-C-W
 │   ├── ablation_tch_only.yaml    # 消融：仅 T-C-H
 │   ├── ablation_thw_only.yaml    # 消融：仅 T-H-W
@@ -119,11 +121,11 @@ video_id,keyframe_id,action_id
 ```bash
 cd pilot_project
 
-# 复现 94.84%（2 GPU DDP，等效 batch=16）
-uv run train.py --config configs/slowfast_stta_reproduce.yaml
+# 主方法（最佳模型）：fast pathway 全部插入 STTA
+uv run train.py --config configs/stta_fast_only.yaml
 
-# 主实验（SlowFast + 全 STTA，单 GPU）
-uv run train.py --config configs/slowfast_stta_full.yaml
+# 对照：slow pathway 全部插入 STTA
+uv run train.py --config configs/stta_slow_only.yaml
 
 # 无注意力基线
 uv run train.py --config configs/slowfast_baseline.yaml
@@ -139,6 +141,52 @@ uv run train.py --config configs/c3d.yaml
 uv run train.py --config configs/i3d.yaml
 uv run train.py --config configs/r2plus1d.yaml
 ```
+
+## Kinetics-400 训练（开箱即用）
+
+本项目支持直接在 Kinetics-400 上训练 SlowFast + STTA，并自动执行标准 30-view 测试协议。
+
+### 1. 下载数据
+
+使用 [`cvdfoundation/kinetics-dataset`](https://github.com/cvdfoundation/kinetics-dataset) 等官方工具下载 K400，解压到项目同级目录 `../data/kinetics400/`：
+
+```
+data/kinetics400/
+├── train/
+│   ├── abseiling/
+│   │   └── *.mp4
+│   └── ... (400 个类别文件夹)
+├── val/
+│   ├── abseiling/
+│   └── ...
+└── annotations/        # 可选
+```
+
+### 2. 安装依赖
+
+`decord` 会随 `uv sync` 自动安装：
+
+```bash
+uv sync
+```
+
+### 3. 训练 + 自动测试
+
+```bash
+uv run train.py --config configs/kinetics400_stta.yaml
+```
+
+训练结束后，Trainer 会用 `best` checkpoint 自动执行 **10 temporal clips × 3 spatial crops = 30 views** 的测试协议，对应 SlowFast 论文标准，指标日志为 `test/acc1` 与 `test/acc5`。
+
+**关键配置项**（在 `configs/kinetics400_stta.yaml`）：
+
+| 字段 | 含义 |
+|------|------|
+| `data.type: kinetics` | 切换到 Kinetics 数据管线 |
+| `data.root` | K400 数据根目录 |
+| `data.clip_len` / `data.frame_interval` | 时间采样：32 帧 × stride 2 |
+| `test.num_clips` / `test.num_crops` | 30-view 默认 10 × 3 |
+| `test.batch_size: 1` | 实际每条视频送入 30 个 clip |
 
 多 GPU 训练通过 YAML 中的 `trainer.devices` 和 `trainer.strategy` 字段控制，无需修改代码：
 
@@ -160,7 +208,7 @@ logging:
 也可通过环境变量临时覆盖：
 
 ```bash
-WANDB_MODE=offline uv run train.py --config configs/slowfast_stta_full.yaml
+WANDB_MODE=offline uv run train.py --config configs/stta_fast_only.yaml
 ```
 
 **TensorBoard 查看训练日志**：每次训练会在 `lightning_logs/` 目录下生成 TensorBoard 事件文件，可用以下命令启动本地服务：
