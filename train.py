@@ -1,7 +1,7 @@
 """Training entry point.
 
 Usage:
-    uv run train.py --config configs/slowfast_stta_full.yaml
+    uv run train.py --config configs/stta_fast_only.yaml
 """
 import argparse
 import os
@@ -58,7 +58,12 @@ def main():
         module = BaselineLightningModule(cfg)
     else:
         module = SlowFastSTTALightningModule(cfg)
-    datamodule = PilotDataModule(cfg)
+    data_type = cfg.data.get('type', 'pilot')
+    if data_type == 'kinetics':
+        from data.kinetics_datamodule import KineticsDataModule
+        datamodule = KineticsDataModule(cfg)
+    else:
+        datamodule = PilotDataModule(cfg)
 
     loggers, tb_logger = build_loggers(cfg, args.config)
 
@@ -97,6 +102,10 @@ def main():
     )
 
     trainer.fit(module, datamodule)
+
+    test_cfg = cfg.get('test', None)
+    if test_cfg and test_cfg.get('enabled', False):
+        trainer.test(module, datamodule=datamodule, ckpt_path='best')
 
 
 if __name__ == '__main__':
