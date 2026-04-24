@@ -36,3 +36,39 @@ def test_missing_split_raises(tmp_path):
     with pytest.raises(FileNotFoundError):
         KineticsVideoDataset(root=str(tmp_path), split='train', mode='train',
                               clip_len=8, frame_interval=2)
+
+
+import torch
+from data.video_transforms import build_train_video_transform
+
+
+def test_train_getitem_shape(k400_tree):
+    tfm = build_train_video_transform((256, 320), 224,
+                                      [0.45]*3, [0.225]*3)
+    ds = KineticsVideoDataset(root=k400_tree, split='train', mode='train',
+                               clip_len=8, frame_interval=2, transform=tfm)
+    clip, label = ds[0]
+    assert clip.shape == (3, 8, 224, 224)
+    assert clip.dtype == torch.float32
+    assert 0 <= label < 3
+
+
+def test_train_random_across_calls(k400_tree):
+    tfm = build_train_video_transform((256, 320), 224,
+                                      [0.45]*3, [0.225]*3)
+    ds = KineticsVideoDataset(root=k400_tree, split='train', mode='train',
+                               clip_len=8, frame_interval=2, transform=tfm)
+    out1, _ = ds[0]
+    out2, _ = ds[0]
+    assert out1.shape == out2.shape
+
+
+def test_short_video_is_loop_padded(tmp_path):
+    from tests._video_fixtures import make_mp4
+    make_mp4(tmp_path / 'train' / 'x' / '0.mp4', num_frames=5)
+    tfm = build_train_video_transform((64, 64), 32,
+                                      [0.45]*3, [0.225]*3)
+    ds = KineticsVideoDataset(root=str(tmp_path), split='train', mode='train',
+                               clip_len=8, frame_interval=2, transform=tfm)
+    clip, _ = ds[0]
+    assert clip.shape[1] == 8

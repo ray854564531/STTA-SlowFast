@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 from pathlib import Path
 from typing import List, Tuple
 
+import numpy as np
 import torch
 from torch.utils.data import Dataset
 
@@ -73,5 +75,38 @@ class KineticsVideoDataset(Dataset):
     def __len__(self) -> int:
         return len(self.samples)
 
+    # ---- helpers ----------------------------------------------------------
+
+    def _decord_reader(self, path: str):
+        import decord
+        decord.bridge.set_bridge('native')
+        return decord.VideoReader(path, num_threads=1)
+
+    def _sample_train_indices(self, total_frames: int) -> np.ndarray:
+        span = self.clip_len * self.frame_interval
+        if total_frames >= span:
+            start = random.randint(0, total_frames - span)
+            idx = np.arange(start, start + span, self.frame_interval)
+        else:
+            base = np.arange(self.clip_len) * self.frame_interval
+            idx = base % total_frames
+        return idx.astype(np.int64)
+
+    # ---- main -------------------------------------------------------------
+
     def __getitem__(self, idx):
-        raise NotImplementedError  # filled in Task 5
+        path, label = self.samples[idx]
+        if self.mode == 'train':
+            return self._get_train(path, label)
+        raise NotImplementedError(f'mode={self.mode!r} not yet implemented')
+
+    def _get_train(self, path: str, label: int):
+        vr = self._decord_reader(path)
+        total = len(vr)
+        indices = self._sample_train_indices(total)
+        indices = np.clip(indices, 0, total - 1)
+        frames = vr.get_batch(indices).asnumpy()
+        clip = torch.from_numpy(frames)
+        if self.transform is not None:
+            clip = self.transform(clip)
+        return clip, label
