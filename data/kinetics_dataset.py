@@ -92,12 +92,28 @@ class KineticsVideoDataset(Dataset):
             idx = base % total_frames
         return idx.astype(np.int64)
 
+    def _center_start(self, total_frames: int) -> int:
+        span = self.clip_len * self.frame_interval
+        return max(0, (total_frames - span) // 2)
+
+    def _sample_val_indices(self, total_frames: int) -> np.ndarray:
+        span = self.clip_len * self.frame_interval
+        if total_frames >= span:
+            start = self._center_start(total_frames)
+            idx = np.arange(start, start + span, self.frame_interval)
+        else:
+            base = np.arange(self.clip_len) * self.frame_interval
+            idx = base % total_frames
+        return idx.astype(np.int64)
+
     # ---- main -------------------------------------------------------------
 
     def __getitem__(self, idx):
         path, label = self.samples[idx]
         if self.mode == 'train':
             return self._get_train(path, label)
+        if self.mode == 'val':
+            return self._get_val(path, label)
         raise NotImplementedError(f'mode={self.mode!r} not yet implemented')
 
     def _get_train(self, path: str, label: int):
@@ -105,6 +121,16 @@ class KineticsVideoDataset(Dataset):
         total = len(vr)
         indices = self._sample_train_indices(total)
         indices = np.clip(indices, 0, total - 1)
+        frames = vr.get_batch(indices).asnumpy()
+        clip = torch.from_numpy(frames)
+        if self.transform is not None:
+            clip = self.transform(clip)
+        return clip, label
+
+    def _get_val(self, path: str, label: int):
+        vr = self._decord_reader(path)
+        total = len(vr)
+        indices = np.clip(self._sample_val_indices(total), 0, total - 1)
         frames = vr.get_batch(indices).asnumpy()
         clip = torch.from_numpy(frames)
         if self.transform is not None:

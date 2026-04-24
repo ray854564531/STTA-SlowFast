@@ -72,3 +72,17 @@ def test_short_video_is_loop_padded(tmp_path):
                                clip_len=8, frame_interval=2, transform=tfm)
     clip, _ = ds[0]
     assert clip.shape[1] == 8
+
+
+from data.video_transforms import build_val_video_transform
+
+
+def test_val_getitem_shape_and_determinism(k400_tree):
+    tfm = build_val_video_transform(256, 224, [0.45]*3, [0.225]*3)
+    ds = KineticsVideoDataset(root=k400_tree, split='val', mode='val',
+                               clip_len=8, frame_interval=2, transform=tfm)
+    clip1, label1 = ds[0]
+    clip2, label2 = ds[0]
+    assert clip1.shape == (3, 8, 224, 224)
+    assert label1 == label2
+    assert torch.equal(clip1, clip2)
