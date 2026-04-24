@@ -108,3 +108,25 @@ def test_test_mode_single_crop(k400_tree):
                                num_clips=5, num_crops=1, transform=tfm)
     clips, _ = ds[0]
     assert clips.shape == (5, 3, 8, 224, 224)
+
+
+def test_train_skips_bad_file(k400_tree):
+    tfm = build_train_video_transform((256, 320), 224,
+                                      [0.45]*3, [0.225]*3)
+    ds = KineticsVideoDataset(root=k400_tree, split='train', mode='train',
+                               clip_len=8, frame_interval=2, transform=tfm)
+    bad_path, _ = ds.samples[0]
+    open(bad_path, 'wb').close()
+    clip, label = ds[0]
+    assert clip.shape == (3, 8, 224, 224)
+
+
+def test_val_returns_minus_one_on_bad_file(k400_tree):
+    tfm = build_val_video_transform(256, 224, [0.45]*3, [0.225]*3)
+    ds = KineticsVideoDataset(root=k400_tree, split='val', mode='val',
+                               clip_len=8, frame_interval=2, transform=tfm)
+    bad_path, _ = ds.samples[0]
+    open(bad_path, 'wb').close()
+    clip, label = ds[0]
+    assert label == -1
+    assert clip.shape == (3, 8, 224, 224)

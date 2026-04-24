@@ -120,39 +120,69 @@ class KineticsVideoDataset(Dataset):
 
     # ---- main -------------------------------------------------------------
 
-    def __getitem__(self, idx):
-        path, label = self.samples[idx]
-        if self.mode == 'train':
-            return self._get_train(path, label)
-        if self.mode == 'val':
-            return self._get_val(path, label)
+    def _safe_reader(self, path: str):
+        try:
+            return self._decord_reader(path)
+        except Exception as exc:
+            logger.warning('Failed to open %s: %s', path, exc)
+            return None
+
+    def _empty_clip(self) -> torch.Tensor:
+        """Sentinel zero clip for val/test on corrupt files."""
+        # Heuristic: infer crop size from composed transform; default 224.
+        size = 224
+        t = getattr(self.transform, 'transforms', None)
+        if t:
+            for step in t:
+                if hasattr(step, 'size') and isinstance(step.size, int):
+                    size = step.size
         if self.mode == 'test':
-            return self._get_test(path, label)
-        raise ValueError(f'Unknown mode: {self.mode!r}')
+            n = self.num_clips * self.num_crops
+            return torch.zeros(n, 3, self.clip_len, size, size,
+                               dtype=torch.float32)
+        return torch.zeros(3, self.clip_len, size, size, dtype=torch.float32)
 
-    def _get_train(self, path: str, label: int):
-        vr = self._decord_reader(path)
+    def __getitem__(self, idx):
+        attempts = 0
+        cur = idx
+        while attempts < max(1, len(self.samples)):
+            path, label = self.samples[cur]
+            vr = self._safe_reader(path)
+            if vr is not None:
+                try:
+                    if self.mode == 'train':
+                        return self._get_train_from_reader(vr, label)
+                    if self.mode == 'val':
+                        return self._get_val_from_reader(vr, label)
+                    if self.mode == 'test':
+                        return self._get_test_from_reader(vr, label)
+                    raise ValueError(f'Unknown mode: {self.mode!r}')
+                except Exception as exc:
+                    logger.warning('Decode failed for %s: %s', path, exc)
+            if self.mode == 'train':
+                cur = random.randrange(len(self.samples))
+                attempts += 1
+                continue
+            return self._empty_clip(), -1
+        return self._empty_clip(), -1
+
+    def _get_train_from_reader(self, vr, label: int):
         total = len(vr)
-        indices = self._sample_train_indices(total)
-        indices = np.clip(indices, 0, total - 1)
-        frames = vr.get_batch(indices).asnumpy()
-        clip = torch.from_numpy(frames)
+        indices = np.clip(self._sample_train_indices(total), 0, total - 1)
+        frames = torch.from_numpy(vr.get_batch(indices).asnumpy())
         if self.transform is not None:
-            clip = self.transform(clip)
-        return clip, label
+            frames = self.transform(frames)
+        return frames, label
 
-    def _get_val(self, path: str, label: int):
-        vr = self._decord_reader(path)
+    def _get_val_from_reader(self, vr, label: int):
         total = len(vr)
         indices = np.clip(self._sample_val_indices(total), 0, total - 1)
-        frames = vr.get_batch(indices).asnumpy()
-        clip = torch.from_numpy(frames)
+        frames = torch.from_numpy(vr.get_batch(indices).asnumpy())
         if self.transform is not None:
-            clip = self.transform(clip)
-        return clip, label
+            frames = self.transform(frames)
+        return frames, label
 
-    def _get_test(self, path: str, label: int):
-        vr = self._decord_reader(path)
+    def _get_test_from_reader(self, vr, label: int):
         total = len(vr)
         starts = self._sample_test_starts(total)
         span = self.clip_len * self.frame_interval
